@@ -1,0 +1,41 @@
+.game-div{
+    width: 80%;
+    margin: auto;
+}
+.your-cards{
+    display: flex;
+    align-items: start;
+    justify-content: center;
+    gap: 1em;
+    margin: auto;
+}
+
+.your-moves{
+    width: fit-content;
+    margin: auto;
+    margin-bottom: 2em;
+    display: flex;
+    gap: 1em;
+}
+
+.card-image{
+    width: 4em;
+}
+
+.other-player-cards{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6em;
+}
+
+.player2-div, .player3-div {
+    border: 1px solid white;
+    padding: 1em;
+}
+
+.center-stack{
+    width: fit-content;
+    margin: auto;
+    margin-bottom: 6em;
+}
