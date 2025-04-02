@@ -3,87 +3,308 @@ import '../App.css';
 import axios from "axios"
 import { socket } from '../connections/connection';
 import "./game.css"
+import placeholderCard from "../assets/cards/placeholder.png"
 
 function Game() {
-    console.log(socket)
-    const [isConnected, setIsConnected] = useState(socket.connected)
-    const [cards, setCards] = useState([])
-    function onConnect() {
-        setIsConnected(true)
+    const [player, setPlayer] = useState({
+        player: "",
+        score: 0,
+        cards: [],
+        sortedCards: {
+            sets: [],
+            runs: [],
+            unsorted: []
+        },
+        connectionID: ""
+    })
+    const [gameState, setGameState] = useState({
+        players: [],
+        winner: "none",
+        dealer: "",
+        turn: "",
+        turnIndex: 0,
+        deck: [],
+        discardPile: []
+    })
+    let discarpileImage = new URL(`../assets/cards/${gameState.discardPile[gameState.discardPile.length - 1]}.jpg`, import.meta.url).href
+    const [selectedCard, setSelectedCard] = useState([])
+    function calculateScore(cardScore) {
+        let total = 0
+        for (let x = 0; x < cardScore.length; x++) {
+            console.log(cardScore[x][0])
+            if (cardScore[x][0] === "A") {
+                total = total + 1
+            } else if (cardScore[x][0] === "K" || cardScore[x][0] === "Q" || cardScore[x][0] === "J") {
+                total = total + 10
+            } else if (cardScore[x][0] === "1") {
+                total = total + 10
+            } else if (!isNaN(cardScore[x][0])) {
+                total = total + parseInt(cardScore[x][0])
+            }
+        }
+        console.log(total)
+        return total
     }
 
-    function onDisconnect() {
-        setIsConnected(false)
+    function sortCards() {
+        let oldCards = [...player.cards]
+        // set is three or more same rank
+        let sets = []
+        // run is four or more same suit
+        let runs = []
+        // let setOrder = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '1', 'K', 'Q', 'J']
+        let setOrder = "A234567891KQJ"
+        let runOrder = 'CDHS'
+        let sortedSets = []
+        let sortedRuns = []
+        for (let x = 0; x < setOrder.length; x++) {
+            let tempSet = []
+            for (let y = 0; y < oldCards.length; y++) {
+                if (oldCards[y][0] === setOrder[x]) {
+                    tempSet.push(oldCards[y])
+                }
+            }
+            if (tempSet.length > 0) {
+                sortedSets.push(tempSet)
+            }
+        }
+        let sortedArray1 = []
+        for (let x = 0; x < sortedSets.length; x++) {
+            if (sortedSets[x].length === 3 || sortedSets[x].length === 4) {
+                sets.push({
+                    opened: false,
+                    rank: sortedSets[x][0][0],
+                    set: sortedSets[x]
+                })
+            } else{
+                sortedArray1.push(...sortedSets[x])
+            }
+        }
+        let sortedArray2 = []
+
+        for (let x = 0; x < runOrder.length; x++) {
+            let tempSet = []
+            for (let y = 0; y < sortedArray1.length; y++) {
+                if(sortedArray1[y][sortedArray1[y].length - 1] === runOrder[x]) {
+                    tempSet.push(sortedArray1[y])
+                }
+            }
+            // console.log(tempSet)
+            if(tempSet.length > 0) {
+                sortedRuns.push(tempSet)
+            }
+        }
+
+        for (let x = 0; x < sortedRuns.length; x++) {
+            if (sortedRuns[x].length > 2) {
+                runs.push({
+                    opened: false,
+                    suit: sortedRuns[x][0][sortedRuns[x][0].length - 1],
+                    set: sortedRuns[x]
+                })
+            } else {
+                sortedArray2.push(...sortedRuns[x])
+            }
+        }
+        console.log(sets, "sets")
+        console.log(runs, "runs")
+        console.log(sortedArray2, "left")
+
     }
 
-    function drop() {
-        socket.emit("playerMove", "drop", "player1")
+
+    useEffect(() => {
+        socket.on("connect", () => {
+            console.log("new player id", socket.id)
+        })
+    
+        socket.on("new player anounce", (id, gs) => {
+            console.log("new player joined", id, gs)
+            for(let x = 0; x < gs.players.length; x++) {
+                if(gs.players[x].connectionID === socket.id) {
+                    setPlayer(gs.players[x])
+                }
+            }
+        })
+
+        socket.on("gameState", (state) => {
+            for (let x = 0; x < state.players.length; x++) {
+                if(state.players[x].connectionID === socket.id) {
+                    setPlayer(state.players[x])
+                }
+            }
+            setGameState(state)
+        })
+
+        // return () => {
+        //     socket.off("connect")
+        //     socket.off("new player anounce")
+        //     socket.off("gameState")
+        // }
+    }, [])
+    // console.log(player)
+    // console.log(gameState)
+
+    let playersList = gameState.players.map((item, index) => {
+        if (gameState.players[index].connectionID !== player.connectionID) {
+            return <div className="player-div" key={index}>
+                <p style={{fontWeight: "bold"}}>{item.player}</p>
+                <div>
+                    <div className="your-cards">
+                        <div className='cards-set-section'>
+                            {gameState.players[index].sortedCards.sets.map((playerSets, setIndex) => {
+                                return <div className='your-cards-subsets' key={setIndex} onClick={() => layoff(playerSets, "set", item.player)}>
+                                        {playerSets.set.map((val2, index2) => {
+                                            const cardUrl = new URL(`../assets/cards/${val2}.jpg`, import.meta.url).href
+                                            return <div key={index2} className='card-image-div' style={{marginLeft: "-3em"}}>
+                                                    <img src={cardUrl} alt={val2} className='card-image'/>
+                                                </div>})
+                                        }
+                                    </div>
+                            })}
+                            {gameState.players[index].sortedCards.runs.map((playerSets, setIndex) => {
+                                return <div className='your-cards-subsets' key={setIndex} onClick={() => layoff(playerSets, "run", item.player)}>
+                                        {playerSets.set.map((val2, index2) => {
+                                            const cardUrl = new URL(`../assets/cards/${val2}.jpg`, import.meta.url).href
+                                            return <div key={index2} className='card-image-div' style={{marginLeft: "-3em"}}>
+                                                    <img src={cardUrl} alt={val2} className='card-image'/>
+                                                </div>})
+                                        }
+                                    </div>
+                            })}
+                        </div>
+                        <div className='cards-set-section'>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        }
+    })
+
+    const cardList = player.sortedCards.unsorted.map((value, index) => {
+        const cardUrl = new URL(`../assets/cards/${value}.jpg`, import.meta.url).href
+        return <div key={index} onClick={() => handleSelectedCard(value, index)} style={{transform: selectedCard[0] === value? "translateY(-20px)": "none", marginLeft: "-3em"}} className='card-image-div'>
+            <img src={cardUrl} alt={value} className='card-image'/>
+        </div>
+    })
+
+    const setList = player.sortedCards.sets.map((value, index) => {
+        return <div className='your-cards-subsets' key={index}>
+            {value.set.map((val2, index2) => {
+                const cardUrl = new URL(`../assets/cards/${val2}.jpg`, import.meta.url).href
+                return <div key={index2} className='card-image-div' style={{marginLeft: "-3em"}}>
+                        <img src={cardUrl} alt={val2} className='card-image'/>
+                    </div>})
+            }
+        </div>
+    })
+
+    const runList = player.sortedCards.runs.map((value, index) => {
+        return <div className='your-cards-subsets' key={index}>
+            {value.set.map((val2, index2) => {
+                const cardUrl = new URL(`../assets/cards/${val2}.jpg`, import.meta.url).href
+                return <div key={index2} className='card-image-div' style={{marginLeft: "-3em"}}>
+                    <img src={cardUrl} alt={val2} className='card-image'/>
+                </div>})
+            }
+        </div>
+    })
+
+    function handleSelectedCard(card, index) {
+        // console.log(card, index)
+        setSelectedCard([card, index])
+    }
+
+    function draw(deck) {
+        if (gameState.turn === player.player) {
+            console.log("drawn from", deck)
+            socket.emit("draw", player, deck)
+        }
     }
 
     function fight() {
         socket.emit("playerMove", "fight", "player1")
     }
 
-    function ungroup() {
-        socket.emit("playerMove", "ungroup", "player1")
+    function layoff(playerset, type, p) {
+        if (gameState.turn === player.player && selectedCard.length !== 0) {
+            console.log(playerset, type, p)
+            console.log(selectedCard)
+            if (type === "set") {
+                if (playerset.rank === selectedCard[0][0]) {
+                    socket.emit("layoff", type, p, selectedCard[0], player)
+                }
+            } else {
+                if (playerset.suit === selectedCard[0][selectedCard[0].length - 1]) {
+                    socket.emit("layoff", type, p, selectedCard[0], player)
+                }
+            }
+        }
     }
 
-    function dump() {
-        socket.emit("playerMove", "dump", "player1")
+    function discard() {
+        if (gameState.turn === player.player && selectedCard.length !== 0) {
+            let newCards = [...player.sortedCards.unsorted]
+            console.log(newCards)
+            let discardPile = gameState.discardPile
+            for (let x = 0; x < newCards.length; x++) {
+                if (newCards[x] === selectedCard[0]) {
+                    newCards.splice(x, 1)
+                    discardPile.push(selectedCard[0])
+                    console.log(newCards)
+                    // setGameState(prev => {
+                    //     return {...prev, discardPile: [...discardPile]}
+                    // })
+                }
+            }
+            // setTurn()
+            socket.emit("discard", discardPile, player.player, newCards)
+        }
     }
-    useEffect(() => {
-        console.log("setting cards")
-        axios.get("http://localhost:3002/play", {
-          result: "test result"
-        })
-        .then(result => {
-            setCards(result.data.cards)
-        })
-        .catch(err => {
-            console.log(err)
-        })
-    }, [isConnected]);
-    socket.on("connect", onConnect)
-    socket.on("disconnect", onDisconnect)
-    // socket.on("gameState", (state) => {
-    //     console.log(state)
-    // })
-    // console.log(cards)
 
-    const cardList = cards.map((value, index) => {
-        const cardUrl = new URL(`../assets/cards/${value}.jpg`, import.meta.url).href
-        return <div key={index}>
-            <img src={cardUrl} alt={value} className='card-image'/>
-        </div>
-    })
     
     return(
         <div>
-            <h1 style={{textAlign: "center"}}>New Game</h1>
             <div className="game-div">
                 <div className="other-player-cards">
-                    <div className="player2-div">
-                        <p>Player 1</p>
-                        <p>Cards: 12</p>
-                        <p>Points: 30</p>
-                    </div>
-                    <div className="player3-div">
-                        <p>Player 2</p>
-                        <p>Cards: 12</p>
-                        <p>Points: 30</p>
-                    </div>
+                    {playersList}
                 </div>
                 <div className="center-stack">
-                    <p>Card Count: 13</p>
+                    <div style={{display: "flex", gap: "2em"}}>
+                        <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
+                            <p>Stock: {gameState.deck.length}</p>
+                            <img src={placeholderCard} alt="placeholder" className='card-image' style={{cursor: "pointer"}} onClick={() => draw("stock")}/>
+                        </div>
+                        <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
+                            <p>Discard Pile: {gameState.discardPile.length}</p>
+                            <img src={gameState.discardPile.length === 0 ? placeholderCard : discarpileImage} alt="placeholder" className='card-image' style={{cursor: "pointer"}} onClick={() => draw("discardpile")}/>
+                        </div>
+                    </div>
+                    <p>Players: {gameState.players.length}</p>
+                    <p>Turn: {gameState.turn}</p>
                 </div>
                 <div className="your-moves">
-                    <button onClick={drop}>drop</button>
+                    <button onClick={draw}>draw</button>
                     <button onClick={fight}>fight</button>
-                    <button onClick={ungroup}>ungroup</button>
-                    <button onClick={dump}>dump</button>
+                    <button onClick={layoff}>layoff</button>
+                    <button onClick={discard}>discard</button>
+                    {/* <button onClick={sortCards}>sort</button> */}
                 </div>
+                <p style={{textAlign: "center"}}>{player.player}</p>
+                <p style={{textAlign: "center"}}>score : {player.score}</p>
+
                 <div className="your-cards">
-                    {cardList}
+                    <div className='cards-set-section'>
+                        {setList}
+                    </div>
+                    <div className='cards-set-section'>
+                        {runList}
+                    </div>
+                    <div style={{border: "2px solid white", padding: "1em"}}>
+                        <div className="your-cards-subsets2">{cardList}</div>
+                        <p style={{textAlign: "center"}}>Unsorted Deck</p>
+                    </div>
                 </div>
             </div>
         </div>

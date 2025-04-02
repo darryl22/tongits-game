@@ -1,13 +1,45 @@
 .game-div{
     width: 80%;
     margin: auto;
+    background-image: url("../assets/graphics/graphics/background.jpeg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin-bottom: 3em;
+    padding: 2em;
 }
 .your-cards{
-    display: flex;
-    align-items: start;
-    justify-content: center;
-    gap: 1em;
     margin: auto;
+    width: fit-content;
+    gap: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.cards-set-section{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2em;
+}
+
+.your-cards-subsets, .your-cards-subsets2{
+    cursor: pointer;
+    transition: 200ms;
+    display: flex;
+    width: fit-content;
+    padding-left: 3em;
+}
+
+.your-cards-subsets:hover {
+    transform: translateY(-10px);
+}
+
+.card-image-div{
+    cursor: pointer;
+    position: relative;
 }
 
 .your-moves{
@@ -15,11 +47,14 @@
     margin: auto;
     margin-bottom: 2em;
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 1em;
 }
 
 .card-image{
-    width: 4em;
+    width: 5em;
+    aspect-ratio: 2 / 3;
 }
 
 .other-player-cards{
@@ -29,13 +64,20 @@
     margin-bottom: 6em;
 }
 
-.player2-div, .player3-div {
-    border: 1px solid white;
+.player-div {
+    border: 2px solid white;
     padding: 1em;
+    border-radius: 10px;
 }
 
 .center-stack{
-    width: fit-content;
+    width: 80%;
     margin: auto;
     margin-bottom: 6em;
+    background-color: rgb(44, 44, 224);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
