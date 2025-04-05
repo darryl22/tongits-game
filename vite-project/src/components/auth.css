@@ -1,0 +1,12 @@
+.auth-form{
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    width: fit-content;
+    margin: auto;
+}
+
+.auth-input{
+    margin-bottom: 1em;
+    padding: 1em;
+}

@@ -6,6 +6,7 @@ import "./game.css"
 import placeholderCard from "../assets/cards/placeholder.png"
 
 function Game() {
+    // let backgroundMusic = new Audio("./public/audio/background.mp3")
     const [player, setPlayer] = useState({
         player: "",
         score: 0,
@@ -125,6 +126,7 @@ function Game() {
                     setPlayer(gs.players[x])
                 }
             }
+            // backgroundMusic.play()
         })
 
         socket.on("gameState", (state) => {
@@ -221,10 +223,14 @@ function Game() {
             console.log("drawn from", deck)
             socket.emit("draw", player, deck)
         }
+
+        if (gameState.deck.length === 0) {
+            socket.emit("game end")
+        }
     }
 
     function fight() {
-        socket.emit("playerMove", "fight", "player1")
+        socket.emit("game end")
     }
 
     function layoff(playerset, type, p) {
@@ -267,10 +273,13 @@ function Game() {
     return(
         <div>
             <div className="game-div">
-                <div className="other-player-cards">
-                    {playersList}
-                </div>
                 <div className="center-stack">
+                    <div className="other-player-cards">
+                        {playersList}
+                    </div>
+                    <div style={{width: "fit-content", margin: "auto", display: gameState.winner === "none" ? "none" : "block"}}>
+                        <p style={{fontSize: "3em"}}>WINNER: {gameState.winner}</p>
+                    </div>
                     <div style={{display: "flex", gap: "2em"}}>
                         <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
                             <p>Stock: {gameState.deck.length}</p>
@@ -291,8 +300,10 @@ function Game() {
                     <button onClick={discard}>discard</button>
                     {/* <button onClick={sortCards}>sort</button> */}
                 </div>
+                <div style={{width: "fit-content", margin: "auto", marginBottom: "3em"}}>
+                    <button onClick={fight} className='tongit-button' style={{display: player.sortedCards.unsorted.length === 0 ? "block" : "none"}}>Call Tongits</button>
+                </div>
                 <p style={{textAlign: "center"}}>{player.player}</p>
-                <p style={{textAlign: "center"}}>score : {player.score}</p>
 
                 <div className="your-cards">
                     <div className='cards-set-section'>

@@ -6,6 +6,8 @@ import './index.css';
 import Home from './components/Home';
 import Nav from './components/Nav';
 import Game from './components/Game';
+import Login from './components/Login';
+import Signup from './components/Signup';
 
 export default function App() {
   return (
@@ -13,7 +15,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Nav />}>
           <Route index element={<Home />} />
-          <Route path="game" element={<Game />} />
+          <Route path="/game" element={<Game />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
         </Route>
       </Routes>
     </BrowserRouter>

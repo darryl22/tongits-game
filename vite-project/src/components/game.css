@@ -1,7 +1,7 @@
 .game-div{
-    width: 80%;
+    width: 100%;
     margin: auto;
-    background-image: url("../assets/graphics/graphics/background.jpeg");
+    background-image: url("../assets/graphics/graphics/background2.webp");
     background-size: cover;
     background-repeat: no-repeat;
     background-position: center;
@@ -16,6 +16,11 @@
     align-items: center;
     justify-content: center;
     flex-wrap: wrap;
+}
+
+.tongit-button{
+    background-color: rgb(0, 19, 140);
+    margin: auto;
 }
 
 .cards-set-section{
@@ -53,7 +58,7 @@
 }
 
 .card-image{
-    width: 5em;
+    width: 4.5em;
     aspect-ratio: 2 / 3;
 }
 
@@ -62,6 +67,8 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 6em;
+    width: 100%;
+    gap: 2em;
 }
 
 .player-div {
@@ -74,7 +81,7 @@
     width: 80%;
     margin: auto;
     margin-bottom: 6em;
-    background-color: rgb(44, 44, 224);
+    /* background-color: rgb(44, 44, 224); */
     border-radius: 10px;
     padding: 20px;
     display: flex;

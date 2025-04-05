@@ -10,18 +10,11 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const { createServer } = require("http");
 const { Server } = require("socket.io");
+const { error } = require('console');
+const port = 3002;
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-    cors: {
-        origin: ["http://localhost:5173", "https://rnjsk-41-90-172-52.a.free.pinggy.link"]
-    },
-    connectionStateRecovery: {
-        maxDisconnectionDuration: 2 * 60 * 1000,
-        skipMiddlewares: true
-    }
-});
 
 const store = new MongoDBStore ({
     uri: "mongodb://localhost:27017/skateapp",
@@ -29,10 +22,11 @@ const store = new MongoDBStore ({
     collection: "mySessions"
 })
 
-const port = 3002;
-
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ["http://localhost:5173"],
+    credentials: true
+}));
 app.use(bodyParser.json());
 app.use(session({
     secret: process.env.SESSION_SECRET,
@@ -43,21 +37,172 @@ app.use(session({
     resave: true,
     saveUninitialized: true
 }))
+app.use(express.static(path.join(__dirname, 'public')));
 
-async function testDB() {
+const io = new Server(httpServer, {
+    cors: {
+        origin: ["http://localhost:5173", "https://rnjsk-41-90-172-52.a.free.pinggy.link"],
+        credentials: true
+    },
+    connectionStateRecovery: {
+        maxDisconnectionDuration: 2 * 60 * 1000,
+        skipMiddlewares: true
+    }
+});
+
+function makeid(length) {
+    let result = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        counter += 1;
+    }
+    return result;
+}
+
+async function createPlayer(player) {
     try{
         const db = client.db("tongits")
         const collection = db.collection("users")
-        let res = await collection.findOne()
-        console.log(res)
+        let res = await collection.insertOne(player)
+        // console.log(res)
+        return res
     } catch(err) {
         console.log(err)
     }
 }
-// testDB()
+
+async function findPlayer(player) {
+    try{
+        const db = client.db("tongits")
+        const collection = db.collection("users")
+        let res = await collection.findOne(player)
+        // console.log(res)
+        return res
+    } catch(err) {
+        console.log(err)
+    }
+}
+
+async function createGame(gameID) {
+    try{
+        const db = client.db("tongits")
+        const collection = db.collection("games")
+        let res = await collection.insertOne({
+            gameid: gameID,
+            players: [],
+            winner: "none",
+            dealer: "",
+            turn: "",
+            turnIndex: 0,
+            deck: [
+                '2C', '2D', '2H', '2S', 
+                '3C', '3D', '3H', '3S', 
+                '4C', '4D', '4H', '4S', 
+                '5C', '5D', '5H', '5S', 
+                '6C', '6D', '6H', '6S', 
+                '7C', '7D', '7H', '7S', 
+                '8C', '8D', '8H', '8S', 
+                '9C', '9D', '9H', '9S', 
+                '10C', '10D', '10H', '10S',
+                'JC', 'JD', 'JH', 'JS',
+                'QC', 'QD', 'QH', 'QS',
+                'KC', 'KD', 'KH', 'KS',
+                'AC', 'AD', 'AH', 'AS'
+            ],
+            discardPile: [],
+            active: true
+        })
+        console.log(res)
+        return res
+    } catch(err) {
+        console.log(err)
+    }
+}
+
+async function findGame(gameID) {
+    try{
+        const db = client.db("tongits")
+        const collection = db.collection("games")
+        let res = await collection.findOne({gameid: gameID})
+        // console.log(res)
+        return res
+    } catch(err) {
+        console.log(err)
+    }
+}
+
+async function getGamesList(filter) {
+    try{
+        const db = client.db("tongits")
+        const collection = db.collection("games")
+        let res = await collection.find(filter).toArray()
+        // console.log(res)
+        return res
+    } catch(err) {
+        console.log(err)
+    }
+}
+
+// Add a route to serve the front end
+// app.get('*', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'public/index.html'));
+// });
+
+app.get("/home", async (req,res) => {
+    console.log("home")
+    let games = await getGamesList({})
+    console.log(games)
+    res.json({user: `${req.session.user}`, leaderboard: []})
+})
+
+app.get("/creategame", async (req, res) => {
+    let gameID = `game${makeid(5)}`
+    req.session.activegame = gameID
+
+    await createGame(gameID)
+    res.json({gameID: gameID})
+})
+
+// app.post("/login", async (req, res) => {
+//     console.log("login")
+//     let user = await findPlayer({name: req.body.data.username})  
+//     if(user !== null) {
+//         if(user.password === req.body.data.password) {
+//             req.session.user = user.playerID
+//             res.json({data: "login success"})
+//         } else {
+//             res.json({error: "Password Missmatch"})
+//         }
+//     } else {
+//         res.json({error: "user does not exist"})
+//     }
+// })
+
+// app.post("/signup", async (req, res) => {
+//     let exists = await findPlayer({name: req.body.data.username})  
+//     console.log("exists", exists)
+//     if (req.body.data.password === req.body.data.confirmpassword && exists === null) {
+//         let user = {
+//             playerID: `player${makeid(4)}`,
+//             name: req.body.data.username,
+//             password: req.body.data.password,
+//             balance: 0,
+//             wins: 0,
+//             losses: 0
+//         }
+//         createPlayer(user)
+//         res.json({status: "success"})
+//     } else if (exists !== null){
+//         res.json({error: "user exists already"})
+//     } else {
+//         res.json({error: "error occured during signup"})
+//     }
+// })
 
 // Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Game logic moved from frontend
 function determineWinner() {
@@ -82,12 +227,6 @@ app.get('/play', (req, res) => {
     res.json({cards: player1Cards, gameState: "test"})
 })
 
-
-// Add a route to serve the front end
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'));
-});
-
 let gameState = {
     players: [],
     winner: "none",
@@ -110,18 +249,6 @@ let gameState = {
         'AC', 'AD', 'AH', 'AS'
     ],
     discardPile: []
-}
-
-function makeid(length) {
-    let result = '';
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    const charactersLength = characters.length;
-    let counter = 0;
-    while (counter < length) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-        counter += 1;
-    }
-    return result;
 }
 
 function calculateScore(cardScore) {
@@ -219,10 +346,28 @@ function setTurn() {
     }
 }
 
+io.engine.use(session({
+    secret: process.env.SESSION_SECRET,
+    cookie: {
+        maxAge: 60 * 60 * 1000
+    },
+    store: store,
+    resave: true,
+    saveUninitialized: true
+}))
+
 io.on("connection", (socket) => {
     if (socket.recovered) {
         console.log("socket recovered", socket.id)
     }
+    userSession = socket.request.session
+    console.log("active game", userSession.activegame)
+    if (userSession.activegame !== undefined) {
+        socket.join(userSession.activegame)
+    }
+
+    console.log(socket.rooms)
+    let req = socket.request
     if (gameState.players.length < 3) {
         let playerCards = []
         let count = 12
@@ -248,6 +393,7 @@ io.on("connection", (socket) => {
 
     io.emit("new player anounce", socket.id, gameState)
     console.log("player has connected", socket.id)
+    // createGame()
     
     socket.on("disconnect", () => {
         console.log("player disconnected", socket.id)
@@ -267,6 +413,13 @@ io.on("connection", (socket) => {
     })
 
     socket.on("draw", (player, deck) => {
+        req.session.reload(err => {
+            if(err) {
+                console.log(err)
+            }
+            req.session.user = "testuser"
+            req.session.save()
+        })
         for (let x = 0; x < gameState.players.length; x++) {
             if (gameState.players[x].player === player.player) {
                 console.log(player.player)
@@ -309,6 +462,7 @@ io.on("connection", (socket) => {
                 for (let y = 0; y < gameState.players[x].sortedCards.unsorted.length; y++) {
                     if(gameState.players[x].sortedCards.unsorted[y] === card) {
                         gameState.players[x].sortedCards.unsorted.splice(y, 1)
+                        gameState.players[x].score = calculateScore(gameState.players[x].sortedCards.unsorted)
                     }
                 }
             }
@@ -325,6 +479,31 @@ io.on("connection", (socket) => {
                 console.log(gameState.discardPile)
             }
         }
+    })
+
+    socket.on("game end", () => {
+        let scores = []
+        let winner = {
+            winner: gameState.players[0].player,
+            score: gameState.players[0].score 
+        }
+        let lowest = gameState.players[0].score
+        for (let x = 0; x < gameState.players.length; x++) {
+            scores.push({
+                player: gameState.players[x].player,
+                score: gameState.players[x].score
+            })
+            if (gameState.players[x].score < lowest) {
+                lowest = gameState.players[x].score
+                winner = {
+                    winner: gameState.players[x].player,
+                    score: gameState.players[x].score 
+                }
+            }
+        }
+        console.log(scores)
+        console.log(winner)
+        gameState.winner = winner.winner
     })
 })
 
