@@ -1,7 +1,8 @@
 .game-div{
     width: 100%;
+    min-height: 60vh;
     margin: auto;
-    background-image: url("../assets/graphics/graphics/background2.webp");
+    background-image: url("../assets/graphics/graphics/background3.jpg");
     background-size: cover;
     background-repeat: no-repeat;
     background-position: center;

@@ -31,7 +31,7 @@ app.use(bodyParser.json());
 app.use(session({
     secret: process.env.SESSION_SECRET,
     cookie: {
-        maxAge: 60 * 60 * 1000
+        maxAge: 60 * 60 * 1000 * 5
     },
     store: store,
     resave: true,
@@ -41,7 +41,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const io = new Server(httpServer, {
     cors: {
-        origin: ["http://localhost:5173", "https://rnjsk-41-90-172-52.a.free.pinggy.link"],
+        origin: ["http://localhost:5173"],
         credentials: true
     },
     connectionStateRecovery: {
@@ -49,6 +49,16 @@ const io = new Server(httpServer, {
         skipMiddlewares: true
     }
 });
+
+io.engine.use(session({
+    secret: process.env.SESSION_SECRET,
+    cookie: {
+        maxAge: 60 * 60 * 1000
+    },
+    store: store,
+    resave: true,
+    saveUninitialized: true
+}))
 
 function makeid(length) {
     let result = '';
@@ -79,6 +89,18 @@ async function findPlayer(player) {
         const db = client.db("tongits")
         const collection = db.collection("users")
         let res = await collection.findOne(player)
+        // console.log(res)
+        return res
+    } catch(err) {
+        console.log(err)
+    }
+}
+
+async function updatePlayer(filter, update) {
+    try{
+        const db = client.db("tongits")
+        const collection = db.collection("users")
+        let res = await collection.updateOne(filter, update)
         // console.log(res)
         return res
     } catch(err) {
@@ -134,6 +156,19 @@ async function findGame(gameID) {
     }
 }
 
+async function updateGame(filter, update) {
+    try{
+        const db = client.db("tongits")
+        const collection = db.collection("games")
+        let res = await collection.updateOne(filter, update)
+        console.log(res)
+        // console.log(res)
+        return res
+    } catch(err) {
+        console.log(err)
+    }
+}
+
 async function getGamesList(filter) {
     try{
         const db = client.db("tongits")
@@ -152,10 +187,13 @@ async function getGamesList(filter) {
 // });
 
 app.get("/home", async (req,res) => {
-    console.log("home")
     let games = await getGamesList({})
-    console.log(games)
-    res.json({user: `${req.session.user}`, leaderboard: []})
+    res.json({user: `${req.session.user}`, gamesList: games, leaderboard: []})
+})
+
+app.get("/userdetails", async (req,res) => {
+    let state = await findGame(req.session.activegame)
+    res.json({player: `${req.session.player}`, activegame: state})
 })
 
 app.get("/creategame", async (req, res) => {
@@ -166,45 +204,12 @@ app.get("/creategame", async (req, res) => {
     res.json({gameID: gameID})
 })
 
-// app.post("/login", async (req, res) => {
-//     console.log("login")
-//     let user = await findPlayer({name: req.body.data.username})  
-//     if(user !== null) {
-//         if(user.password === req.body.data.password) {
-//             req.session.user = user.playerID
-//             res.json({data: "login success"})
-//         } else {
-//             res.json({error: "Password Missmatch"})
-//         }
-//     } else {
-//         res.json({error: "user does not exist"})
-//     }
-// })
+app.post("/getstate", async (req,res) => {
+    console.log(req.session.activegame)
+    let state = await findGame(req.session.activegame)
+    res.json({state: state, player: `${req.session.player}`})
+})
 
-// app.post("/signup", async (req, res) => {
-//     let exists = await findPlayer({name: req.body.data.username})  
-//     console.log("exists", exists)
-//     if (req.body.data.password === req.body.data.confirmpassword && exists === null) {
-//         let user = {
-//             playerID: `player${makeid(4)}`,
-//             name: req.body.data.username,
-//             password: req.body.data.password,
-//             balance: 0,
-//             wins: 0,
-//             losses: 0
-//         }
-//         createPlayer(user)
-//         res.json({status: "success"})
-//     } else if (exists !== null){
-//         res.json({error: "user exists already"})
-//     } else {
-//         res.json({error: "error occured during signup"})
-//     }
-// })
-
-// Serve static files
-
-// Game logic moved from frontend
 function determineWinner() {
     const randomValue = Math.random(); // 0 to 1
     return randomValue < 0.8 ? 'house' : 'player'; // 80% house win, 20% player win
@@ -228,6 +233,7 @@ app.get('/play', (req, res) => {
 })
 
 let gameState = {
+    gameid: "",
     players: [],
     winner: "none",
     dealer: "",
@@ -248,7 +254,8 @@ let gameState = {
         'KC', 'KD', 'KH', 'KS',
         'AC', 'AD', 'AH', 'AS'
     ],
-    discardPile: []
+    discardPile: [],
+    active: true
 }
 
 function calculateScore(cardScore) {
@@ -336,7 +343,8 @@ function sortCards(cardArray) {
 
 }
 
-function setTurn() {
+async function setTurn(gameid) {
+    let gameState = await findGame(gameid)
     if (gameState.turnIndex === gameState.players.length - 1) {
         gameState.turn = gameState.players[0].player
         gameState.turnIndex = 0
@@ -344,17 +352,9 @@ function setTurn() {
         gameState.turn = gameState.players[gameState.turnIndex + 1].player
         gameState.turnIndex = gameState.turnIndex + 1
     }
-}
 
-io.engine.use(session({
-    secret: process.env.SESSION_SECRET,
-    cookie: {
-        maxAge: 60 * 60 * 1000
-    },
-    store: store,
-    resave: true,
-    saveUninitialized: true
-}))
+    await updateGame({gameid: gameid}, {$set: {turn: gameState.turn, turnIndex: gameState.turnIndex}})
+}
 
 io.on("connection", (socket) => {
     if (socket.recovered) {
@@ -365,80 +365,112 @@ io.on("connection", (socket) => {
     if (userSession.activegame !== undefined) {
         socket.join(userSession.activegame)
     }
-
-    console.log(socket.rooms)
     let req = socket.request
-    if (gameState.players.length < 3) {
+    
+    socket.on("join game", async (gameID) => {
+        console.log("joined game", gameID)
+        socket.join(gameID)
+        console.log(socket.rooms)
+        let game = await findGame(gameID)
+
+        let deck = game.deck
         let playerCards = []
         let count = 12
+        console.log(deck)
+        let newPlayerId = `player${makeid(4)}`
         for (let x = 0; x < count; x++) {
-            let index = Math.floor(Math.random() * gameState.deck.length)
-            playerCards.push(gameState.deck[index])
-            gameState.deck.splice(index, 1)
+            let index = Math.floor(Math.random() * deck.length)
+            playerCards.push(game.deck[index])
+            deck.splice(index, 1)
         }
-        let sorted = sortCards(playerCards)
-        gameState.players.push({
-            player: `player${makeid(4)}`,
-            score: calculateScore(sorted.unsorted),
+        console.log(deck)
+        let newPlayer = {
+            player: newPlayerId,
+            score: 0,
             cards: playerCards,
             sortedCards: sortCards(playerCards),
             connectionID: socket.id
-        })
-    }
-    if (gameState.players.length > 1) {
-        let turnIndex = Math.floor(Math.random() * gameState.players.length)
-        gameState.turn = gameState.players[turnIndex].player
-        gameState.turnIndex = turnIndex
-    }
+        }
 
-    io.emit("new player anounce", socket.id, gameState)
-    console.log("player has connected", socket.id)
-    // createGame()
+        if(userSession.player === undefined || userSession.activegame !== gameID) {
+            req.session.reload(err => {
+                if(err) {
+                    console.log(err)
+                }
+                req.session.activegame = gameID
+                req.session.player = newPlayer.player
+                req.session.save()
+            })
+            if (game.players.length === 0) {
+                let state = await updateGame({gameid: gameID}, {$push: {players: newPlayer}, $set: {deck: deck, turn: newPlayer.player, dealer: newPlayer.player}})
+                io.to(gameID).emit("new player", userSession.player, state)
+                console.log("player has connected", socket.id)
+            } else {
+                let state = await updateGame({gameid: gameID}, {$push: {players: newPlayer}, $set: {deck: deck}})
+                console.log(state)
+                io.to(gameID).emit("new player", userSession.player, state)
+                console.log("player has connected", socket.id)
+            }
+            
+        } else {
+            // let isInGame = false
+            // for (let x = 0; x < game.players.length; x++) {
+            //     if (game.players[x].player === userSession.player) {
+            //         isInGame = true
+            //     }
+            // }
+            req.session.reload(err => {
+                if(err) {
+                    console.log(err)
+                }
+                req.session.activegame = gameID
+                req.session.save()
+            })
+            // console.log(state)
+            io.to(gameID).emit("new player", userSession.player, game)
+            // io.to(gameID).emit("update state")
+            console.log("player has connected", socket.id)
+        }
+    })
     
     socket.on("disconnect", () => {
         console.log("player disconnected", socket.id)
-        for (let x = 0; x < gameState.players.length; x++) {
-            if (gameState.players[x].connectionID === socket.id) {
-                console.log(gameState.players[x].player, "is free")
-                let newDeck = gameState.deck.concat(gameState.players[x].cards)
-                gameState.deck = newDeck
-                gameState.players.splice(x, 1)
+        // console.log(userSession)
+        // for (let x = 0; x < gameState.players.length; x++) {
+        //     if (gameState.players[x].connectionID === socket.id) {
+        //         console.log(gameState.players[x].player, "is free")
+        //         let newDeck = gameState.deck.concat(gameState.players[x].cards)
+        //         gameState.deck = newDeck
+        //         gameState.players.splice(x, 1)
 
-            }
-        }
+        //     }
+        // }
     })
 
-    socket.on("playerMove", (move, player, gs) => {
-        console.log(`${move} made by player ${player}`)
-    })
-
-    socket.on("draw", (player, deck) => {
-        req.session.reload(err => {
-            if(err) {
-                console.log(err)
-            }
-            req.session.user = "testuser"
-            req.session.save()
-        })
+    socket.on("draw", async (player, deck, id) => {
+        let gameState = await findGame(id)
         for (let x = 0; x < gameState.players.length; x++) {
             if (gameState.players[x].player === player.player) {
-                console.log(player.player)
                 if(deck === "stock" && gameState.deck.length !== 0) {
                     console.log(gameState.deck)
                     gameState.players[x].sortedCards.unsorted.push(gameState.deck[gameState.deck.length - 1])
                     gameState.deck.pop()
+                    await updateGame({gameid: id}, {$set: {deck: gameState.deck, players: gameState.players}})
                 } else if (deck === "discardpile" && gameState.discardPile.length !== 0) {
                     console.log(gameState.discardPile)
                     gameState.players[x].sortedCards.unsorted.push(gameState.discardPile[gameState.discardPile.length - 1])
                     gameState.discardPile.pop()
+                    await updateGame({gameid: id}, {$set: {deck: gameState.deck, players: gameState.players, discardPile: gameState.discardPile}})
                 }
             }
         }
+        await setTurn(id)
+        io.to(id).emit("update state")
     })
 
-    socket.on("layoff", (type, player, card, playerFrom) => {
+    socket.on("layoff", async (type, player, card, playerFrom, id) => {
+        let gameState = await findGame(id)
         console.log("layoff", type)
-        console.log(player)
         for (let x = 0; x < gameState.players.length; x++) {
             if (gameState.players[x].player === player) {
                 if(type === "run") {
@@ -467,11 +499,15 @@ io.on("connection", (socket) => {
                 }
             }
         }
-        setTurn()
+        await updateGame({gameid: id}, {$set: {players: gameState.players}})
+        await setTurn(id)
+        io.to(id).emit("update state")
     })
-    socket.on("discard", (pile, player, cards) => {
+
+    socket.on("discard", async (pile, player, cards, id) => {
+        let gameState = await findGame(id)
+        console.log(pile)
         gameState.discardPile = pile
-        setTurn()
         for (let x = 0; x < gameState.players.length; x++) {
             if (gameState.players[x].player === player) {
                 gameState.players[x].sortedCards.unsorted = cards
@@ -479,9 +515,13 @@ io.on("connection", (socket) => {
                 console.log(gameState.discardPile)
             }
         }
+        await updateGame({gameid: id}, {$set: {players: gameState.players, discardPile: gameState.discardPile}})
+        await setTurn(id)
+        io.to(id).emit("update state")
     })
 
-    socket.on("game end", () => {
+    socket.on("game end", async (id) => {
+        let gameState = await findGame(id)
         let scores = []
         let winner = {
             winner: gameState.players[0].player,
@@ -504,12 +544,16 @@ io.on("connection", (socket) => {
         console.log(scores)
         console.log(winner)
         gameState.winner = winner.winner
+
+        await updateGame({gameid: id}, {$set: {winner: gameState.winner, active: false}})
+        io.to(id).emit("update state")
+
     })
 })
 
-setInterval(() => {
-    io.sockets.emit('gameState', gameState)
-}, 1000)
+// setInterval(() => {
+//     io.sockets.emit('gameState', gameState)
+// }, 1000)
 
 // Start the server
 httpServer.listen(port, () => {

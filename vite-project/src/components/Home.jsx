@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import '../App.css';
 import { Link } from "react-router-dom";
 
@@ -11,30 +11,48 @@ function Home() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [playerStats, setPlayerStats] = useState(null);
   const [redirectTo, setRedirectTo] = useState([false, ""])
+  const [gamesList, setGamesList] = useState()
+  const navigate = useNavigate()
   if (redirectTo[0] === true) {
-      return <Navigate to={redirectTo[1]}/>
+    return <Navigate to={redirectTo[1]}/>
   }
 
-  useEffect(() => {
-    axios.get("http://localhost:3002/home", {withCredentials: "true"})
-    .then(result => {
-      console.log(result)
-      setUser(result.data.user)
-    })
-    .catch(err => {
-      console.log(err)
-    })
-  }, []);
+  function joinGame(gameID) {
+    console.log(gameID)
+    socket.emit("join game", gameID)
+    navigate("/game")
+  }
 
   function createGame() {
     axios.get("http://localhost:3002/creategame", {withCredentials: "true"})
     .then(result => {
       console.log(result)
+      socket.emit("join game", result.data.gameID)
+      navigate("/game")
+
     })
     .catch(err => {
       console.log(err)
     })
   }
+  
+  useEffect(() => {
+    axios.get("http://localhost:3002/home", {withCredentials: "true"})
+    .then(result => {
+      console.log(result.data)
+      let games = result.data.gamesList.map((item, index) => {
+        console.log(item.active)
+        return <div className='open-game-item' key={index}>
+          <p>gameID: {item.gameid}</p>
+          <button onClick={()=> joinGame(item.gameid)}>Join</button>
+        </div>
+      })
+      setGamesList(games)
+    })
+    .catch(err => {
+      console.log(err)
+    })
+  }, []);
 
   return (
     <div className='home-main-div'>
@@ -50,14 +68,14 @@ function Home() {
         <div>
             <h2>Game Results</h2>
             <ul>
-            
             </ul>
         </div>
-        <div>
-            <h2>Leaderboard</h2>
-            <ul>
-            
-            </ul>
+        
+        <div className='open-games'>
+          <h2>Open Games</h2>
+          <div className='open-games-div'>
+            {gamesList}
+          </div>
         </div>
         {/* {playerStats && (
             <div>

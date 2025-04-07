@@ -72,6 +72,26 @@ button:focus-visible {
   align-items: center;
 }
 
+.open-games-div{
+  border: 2px solid gray;
+  padding: 2em;
+  height: 50vh;
+  width: 30vw;
+  min-width: 250px;
+  overflow-y: scroll;
+}
+
+.open-game-item{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2em;
+  padding: 1em;
+  border: 1px solid white;
+  margin-bottom: 1em;
+  border-radius: 10px;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

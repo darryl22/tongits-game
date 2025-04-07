@@ -19,14 +19,18 @@ function Game() {
         connectionID: ""
     })
     const [gameState, setGameState] = useState({
+        gameid: "",
         players: [],
         winner: "none",
         dealer: "",
         turn: "",
         turnIndex: 0,
         deck: [],
-        discardPile: []
+        discardPile: [],
+        active: true
     })
+
+    const [updateCount, setUpdateCount] = useState(0)
     let discarpileImage = new URL(`../assets/cards/${gameState.discardPile[gameState.discardPile.length - 1]}.jpg`, import.meta.url).href
     const [selectedCard, setSelectedCard] = useState([])
     function calculateScore(cardScore) {
@@ -118,25 +122,56 @@ function Game() {
         socket.on("connect", () => {
             console.log("new player id", socket.id)
         })
+
     
-        socket.on("new player anounce", (id, gs) => {
-            console.log("new player joined", id, gs)
-            for(let x = 0; x < gs.players.length; x++) {
-                if(gs.players[x].connectionID === socket.id) {
-                    setPlayer(gs.players[x])
-                }
-            }
+        socket.on("new player", (player, gs) => {
+            console.log("new player joined", player)
+            console.log(gs)
             // backgroundMusic.play()
         })
 
-        socket.on("gameState", (state) => {
-            for (let x = 0; x < state.players.length; x++) {
-                if(state.players[x].connectionID === socket.id) {
-                    setPlayer(state.players[x])
+        socket.on("update state", () => {
+            console.log("update state")
+            axios.post("http://localhost:3002/getstate", {data: gameState.gameid}, {withCredentials: "true"})
+            .then(result => {
+                console.log(result.data.state)
+                let game = result.data.state
+                for(let x = 0; x < game.players.length; x++) {
+                    if(game.players[x].player === result.data.player) {
+                        setPlayer(game.players[x])
+                    }
+                }
+                setGameState(result.data.state)
+            })
+            .catch(err => {
+            console.log(err)
+            })
+        })
+
+        axios.get("http://localhost:3002/userdetails", {withCredentials: "true"})
+        .then(result => {
+            let game = result.data.activegame
+            console.log(result.data)
+            for(let x = 0; x < game.players.length; x++) {
+                if(game.players[x].player === result.data.player) {
+                    setPlayer(game.players[x])
                 }
             }
-            setGameState(state)
+            setGameState(game)
         })
+        .catch(err => {
+        console.log(err)
+        })
+
+        // socket.on("gameState", (state) => {
+        //     for (let x = 0; x < state.players.length; x++) {
+        //         if(state.players[x].connectionID === socket.id) {
+        //             setPlayer(state.players[x])
+        //         }
+        //     }
+        //     setGameState(state)
+        // })
+
 
         // return () => {
         //     socket.off("connect")
@@ -145,10 +180,10 @@ function Game() {
         // }
     }, [])
     // console.log(player)
-    // console.log(gameState)
+    console.log(gameState.players)
 
     let playersList = gameState.players.map((item, index) => {
-        if (gameState.players[index].connectionID !== player.connectionID) {
+        if (gameState.players[index].player !== player.player) {
             return <div className="player-div" key={index}>
                 <p style={{fontWeight: "bold"}}>{item.player}</p>
                 <div>
@@ -221,16 +256,23 @@ function Game() {
     function draw(deck) {
         if (gameState.turn === player.player) {
             console.log("drawn from", deck)
-            socket.emit("draw", player, deck)
+            if (deck === "discardpile" && gameState.discardPile.length !== 0) {
+                socket.emit("draw", player, deck, gameState.gameid)
+            } else if(deck !== "discardpile") {
+                socket.emit("draw", player, deck, gameState.gameid)
+            }
         }
 
         if (gameState.deck.length === 0) {
-            socket.emit("game end")
+            socket.emit("game end", gameState.gameid)
         }
     }
 
     function fight() {
-        socket.emit("game end")
+        if(gameState.turn === player.player) {
+            console.log("fight")
+            socket.emit("game end", gameState.gameid)
+        }
     }
 
     function layoff(playerset, type, p) {
@@ -239,11 +281,11 @@ function Game() {
             console.log(selectedCard)
             if (type === "set") {
                 if (playerset.rank === selectedCard[0][0]) {
-                    socket.emit("layoff", type, p, selectedCard[0], player)
+                    socket.emit("layoff", type, p, selectedCard[0], player, gameState.gameid)
                 }
             } else {
                 if (playerset.suit === selectedCard[0][selectedCard[0].length - 1]) {
-                    socket.emit("layoff", type, p, selectedCard[0], player)
+                    socket.emit("layoff", type, p, selectedCard[0], player, gameState.gameid)
                 }
             }
         }
@@ -265,7 +307,7 @@ function Game() {
                 }
             }
             // setTurn()
-            socket.emit("discard", discardPile, player.player, newCards)
+            socket.emit("discard", discardPile, player.player, newCards, gameState.gameid)
         }
     }
 
@@ -273,27 +315,28 @@ function Game() {
     return(
         <div>
             <div className="game-div">
-                <div className="center-stack">
+                <div style={{width: "fit-content", margin: "auto", display: gameState.winner === "none" ? "none" : "block"}}>
+                    <p style={{fontSize: "3em"}}>WINNER: {gameState.winner}</p>
+                </div>
+                <p style={{color: "black", textAlign: "center", fontSize: "1.2em"}}> gameID: {gameState.gameid}</p>
+                <div className="center-stack" style={{display: gameState.active ? "flex" : "none"}}>
                     <div className="other-player-cards">
                         {playersList}
                     </div>
-                    <div style={{width: "fit-content", margin: "auto", display: gameState.winner === "none" ? "none" : "block"}}>
-                        <p style={{fontSize: "3em"}}>WINNER: {gameState.winner}</p>
-                    </div>
                     <div style={{display: "flex", gap: "2em"}}>
                         <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
-                            <p>Stock: {gameState.deck.length}</p>
+                            <p style={{fontWeight: "bold"}}>Stock: {gameState.deck.length}</p>
                             <img src={placeholderCard} alt="placeholder" className='card-image' style={{cursor: "pointer"}} onClick={() => draw("stock")}/>
                         </div>
                         <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
-                            <p>Discard Pile: {gameState.discardPile.length}</p>
+                            <p style={{fontWeight: "bold"}}>Discard Pile: {gameState.discardPile.length}</p>
                             <img src={gameState.discardPile.length === 0 ? placeholderCard : discarpileImage} alt="placeholder" className='card-image' style={{cursor: "pointer"}} onClick={() => draw("discardpile")}/>
                         </div>
                     </div>
-                    <p>Players: {gameState.players.length}</p>
-                    <p>Turn: {gameState.turn}</p>
+                    <p style={{fontWeight: "bold"}}>Players: {gameState.players.length}</p>
+                    <p style={{fontWeight: "bold"}}>Turn: {gameState.turn}</p>
                 </div>
-                <div className="your-moves">
+                <div className="your-moves" style={{display: gameState.active ? "flex" : "none"}}>
                     <button onClick={draw}>draw</button>
                     <button onClick={fight}>fight</button>
                     <button onClick={layoff}>layoff</button>
@@ -303,9 +346,9 @@ function Game() {
                 <div style={{width: "fit-content", margin: "auto", marginBottom: "3em"}}>
                     <button onClick={fight} className='tongit-button' style={{display: player.sortedCards.unsorted.length === 0 ? "block" : "none"}}>Call Tongits</button>
                 </div>
-                <p style={{textAlign: "center"}}>{player.player}</p>
+                <p style={{textAlign: "center", fontWeight: "bold"}}>{player.player}</p>
 
-                <div className="your-cards">
+                <div className="your-cards" style={{display: gameState.active ? "flex" : "none"}}>
                     <div className='cards-set-section'>
                         {setList}
                     </div>
