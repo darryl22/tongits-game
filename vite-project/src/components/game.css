@@ -1,6 +1,6 @@
 .game-div{
     width: 100%;
-    min-height: 60vh;
+    min-height: 80vh;
     margin: auto;
     background-image: url("../assets/graphics/graphics/background3.jpg");
     background-size: cover;
@@ -46,6 +46,7 @@
 .card-image-div{
     cursor: pointer;
     position: relative;
+    transition: 200ms;
 }
 
 .your-moves{

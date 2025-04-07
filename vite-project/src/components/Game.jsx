@@ -5,6 +5,11 @@ import { socket } from '../connections/connection';
 import "./game.css"
 import placeholderCard from "../assets/cards/placeholder.png"
 
+const swapSound = new Audio("/audio/swapsound.mp3")
+const discardSound = new Audio("/audio/discardsound.mp3")
+const chimeSound = new Audio("/audio/chime.mp3")
+const winner = new Audio("/audio/winner.mp3")
+
 function Game() {
     // let backgroundMusic = new Audio("./public/audio/background.mp3")
     const [player, setPlayer] = useState({
@@ -31,7 +36,7 @@ function Game() {
     })
 
     const [updateCount, setUpdateCount] = useState(0)
-    let discarpileImage = new URL(`../assets/cards/${gameState.discardPile[gameState.discardPile.length - 1]}.jpg`, import.meta.url).href
+    let discarpileImage = new URL(`../assets/cards2/${gameState.discardPile[gameState.discardPile.length - 1]}.svg`, import.meta.url).href
     const [selectedCard, setSelectedCard] = useState([])
     function calculateScore(cardScore) {
         let total = 0
@@ -192,7 +197,7 @@ function Game() {
                             {gameState.players[index].sortedCards.sets.map((playerSets, setIndex) => {
                                 return <div className='your-cards-subsets' key={setIndex} onClick={() => layoff(playerSets, "set", item.player)}>
                                         {playerSets.set.map((val2, index2) => {
-                                            const cardUrl = new URL(`../assets/cards/${val2}.jpg`, import.meta.url).href
+                                            const cardUrl = new URL(`../assets/cards2/${val2}.svg`, import.meta.url).href
                                             return <div key={index2} className='card-image-div' style={{marginLeft: "-3em"}}>
                                                     <img src={cardUrl} alt={val2} className='card-image'/>
                                                 </div>})
@@ -202,7 +207,7 @@ function Game() {
                             {gameState.players[index].sortedCards.runs.map((playerSets, setIndex) => {
                                 return <div className='your-cards-subsets' key={setIndex} onClick={() => layoff(playerSets, "run", item.player)}>
                                         {playerSets.set.map((val2, index2) => {
-                                            const cardUrl = new URL(`../assets/cards/${val2}.jpg`, import.meta.url).href
+                                            const cardUrl = new URL(`../assets/cards2/${val2}.svg`, import.meta.url).href
                                             return <div key={index2} className='card-image-div' style={{marginLeft: "-3em"}}>
                                                     <img src={cardUrl} alt={val2} className='card-image'/>
                                                 </div>})
@@ -220,7 +225,7 @@ function Game() {
     })
 
     const cardList = player.sortedCards.unsorted.map((value, index) => {
-        const cardUrl = new URL(`../assets/cards/${value}.jpg`, import.meta.url).href
+        const cardUrl = new URL(`../assets/cards2/${value}.svg`, import.meta.url).href
         return <div key={index} onClick={() => handleSelectedCard(value, index)} style={{transform: selectedCard[0] === value? "translateY(-20px)": "none", marginLeft: "-3em"}} className='card-image-div'>
             <img src={cardUrl} alt={value} className='card-image'/>
         </div>
@@ -229,7 +234,7 @@ function Game() {
     const setList = player.sortedCards.sets.map((value, index) => {
         return <div className='your-cards-subsets' key={index}>
             {value.set.map((val2, index2) => {
-                const cardUrl = new URL(`../assets/cards/${val2}.jpg`, import.meta.url).href
+                const cardUrl = new URL(`../assets/cards2/${val2}.svg`, import.meta.url).href
                 return <div key={index2} className='card-image-div' style={{marginLeft: "-3em"}}>
                         <img src={cardUrl} alt={val2} className='card-image'/>
                     </div>})
@@ -240,7 +245,7 @@ function Game() {
     const runList = player.sortedCards.runs.map((value, index) => {
         return <div className='your-cards-subsets' key={index}>
             {value.set.map((val2, index2) => {
-                const cardUrl = new URL(`../assets/cards/${val2}.jpg`, import.meta.url).href
+                const cardUrl = new URL(`../assets/cards2/${val2}.svg`, import.meta.url).href
                 return <div key={index2} className='card-image-div' style={{marginLeft: "-3em"}}>
                     <img src={cardUrl} alt={val2} className='card-image'/>
                 </div>})
@@ -251,6 +256,7 @@ function Game() {
     function handleSelectedCard(card, index) {
         // console.log(card, index)
         setSelectedCard([card, index])
+        swapSound.play()
     }
 
     function draw(deck) {
@@ -270,6 +276,7 @@ function Game() {
 
     function fight() {
         if(gameState.turn === player.player) {
+            winner.play()
             console.log("fight")
             socket.emit("game end", gameState.gameid)
         }
@@ -277,6 +284,7 @@ function Game() {
 
     function layoff(playerset, type, p) {
         if (gameState.turn === player.player && selectedCard.length !== 0) {
+            chimeSound.play()
             console.log(playerset, type, p)
             console.log(selectedCard)
             if (type === "set") {
@@ -293,6 +301,7 @@ function Game() {
 
     function discard() {
         if (gameState.turn === player.player && selectedCard.length !== 0) {
+            discardSound.play()
             let newCards = [...player.sortedCards.unsorted]
             console.log(newCards)
             let discardPile = gameState.discardPile
