@@ -129,15 +129,30 @@ function Game() {
         })
 
     
-        socket.on("new player", (player, gs) => {
+        socket.on("new player", (id) => {
             console.log("new player joined", player)
-            console.log(gs)
+            axios.post("http://localhost:3002/getstate", {data: id}, {withCredentials: "true"})
+            // axios.post("http://185.202.239.81:3002/getstate", {data: gameState.gameid}, {withCredentials: "true"})
+            .then(result => {
+                console.log(result.data.state)
+                let game = result.data.state
+                for(let x = 0; x < game.players.length; x++) {
+                    if(game.players[x].player === result.data.player) {
+                        setPlayer(game.players[x])
+                    }
+                }
+                setGameState(result.data.state)
+            })
+            .catch(err => {
+            console.log(err)
+            })
             // backgroundMusic.play()
         })
 
         socket.on("update state", () => {
             console.log("update state")
             axios.post("http://localhost:3002/getstate", {data: gameState.gameid}, {withCredentials: "true"})
+            // axios.post("http://185.202.239.81:3002/getstate", {data: gameState.gameid}, {withCredentials: "true"})
             .then(result => {
                 console.log(result.data.state)
                 let game = result.data.state
@@ -154,6 +169,7 @@ function Game() {
         })
 
         axios.get("http://localhost:3002/userdetails", {withCredentials: "true"})
+        // axios.get("http://185.202.239.81:3002/userdetails", {withCredentials: "true"})
         .then(result => {
             let game = result.data.activegame
             console.log(result.data)

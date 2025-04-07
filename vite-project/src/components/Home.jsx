@@ -25,6 +25,7 @@ function Home() {
 
   function createGame() {
     axios.get("http://localhost:3002/creategame", {withCredentials: "true"})
+    // axios.get("http://185.202.239.81:3002/creategame", {withCredentials: "true"})
     .then(result => {
       console.log(result)
       socket.emit("join game", result.data.gameID)
@@ -38,6 +39,7 @@ function Home() {
   
   useEffect(() => {
     axios.get("http://localhost:3002/home", {withCredentials: "true"})
+    // axios.get("http://185.202.239.81:3002/home", {withCredentials: "true"})
     .then(result => {
       console.log(result.data)
       let games = result.data.gamesList.map((item, index) => {

@@ -392,7 +392,7 @@ io.on("connection", (socket) => {
             connectionID: socket.id
         }
 
-        if(userSession.player === undefined || userSession.activegame !== gameID) {
+        if(userSession.player === undefined || userSession.activegame !== gameID && game.players.length < 3) {
             req.session.reload(err => {
                 if(err) {
                     console.log(err)
@@ -401,16 +401,15 @@ io.on("connection", (socket) => {
                 req.session.player = newPlayer.player
                 req.session.save()
             })
-            if (game.players.length === 0) {
-                let state = await updateGame({gameid: gameID}, {$push: {players: newPlayer}, $set: {deck: deck, turn: newPlayer.player, dealer: newPlayer.player}})
-                io.to(gameID).emit("new player", userSession.player, state)
+            game.players.push(newPlayer)
+            if (game.players.length === 1) {
+                await updateGame({gameid: gameID}, {$set: {players: game.players, deck: deck, turn: newPlayer.player, dealer: newPlayer.player}})
                 console.log("player has connected", socket.id)
             } else {
-                let state = await updateGame({gameid: gameID}, {$push: {players: newPlayer}, $set: {deck: deck}})
-                console.log(state)
-                io.to(gameID).emit("new player", userSession.player, state)
+                await updateGame({gameid: gameID}, {$set: {players: game.players, deck: deck}})
                 console.log("player has connected", socket.id)
             }
+            io.to(gameID).emit("new player", gameID)
             
         } else {
             // let isInGame = false
@@ -427,8 +426,7 @@ io.on("connection", (socket) => {
                 req.session.save()
             })
             // console.log(state)
-            io.to(gameID).emit("new player", userSession.player, game)
-            // io.to(gameID).emit("update state")
+            io.to(gameID).emit("new player", gameID)
             console.log("player has connected", socket.id)
         }
     })
