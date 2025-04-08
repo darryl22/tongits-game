@@ -4,6 +4,7 @@ import axios from "axios"
 import { socket } from '../connections/connection';
 import "./game.css"
 import placeholderCard from "../assets/cards/placeholder.png"
+// import { useCookies } from 'react-cookie';
 
 const swapSound = new Audio("/audio/swapsound.mp3")
 const discardSound = new Audio("/audio/discardsound.mp3")
@@ -12,6 +13,7 @@ const winner = new Audio("/audio/winner.mp3")
 
 function Game() {
     // let backgroundMusic = new Audio("./public/audio/background.mp3")
+    // const [cookies, setCookie, removeCookie] = useCookies(["player"])
     const [player, setPlayer] = useState({
         player: "",
         score: 0,
@@ -35,8 +37,6 @@ function Game() {
         active: true
     })
 
-    const [updateCount, setUpdateCount] = useState(0)
-    let discarpileImage = new URL(`../assets/cards2/${gameState.discardPile[gameState.discardPile.length - 1]}.svg`, import.meta.url).href
     const [selectedCard, setSelectedCard] = useState([])
     function calculateScore(cardScore) {
         let total = 0
@@ -121,64 +121,58 @@ function Game() {
         console.log(sortedArray2, "left")
 
     }
-
-
+    let playerSession = sessionStorage.getItem("player")
+    let gameSession = sessionStorage.getItem("gameID")
     useEffect(() => {
         socket.on("connect", () => {
             console.log("new player id", socket.id)
         })
 
-    
-        socket.on("new player", (id) => {
-            console.log("new player joined", player)
-            axios.post("http://localhost:3002/getstate", {data: id}, {withCredentials: "true"})
-            // axios.post("http://185.202.239.81:3002/getstate", {data: gameState.gameid}, {withCredentials: "true"})
-            .then(result => {
-                console.log(result.data.state)
-                let game = result.data.state
-                for(let x = 0; x < game.players.length; x++) {
-                    if(game.players[x].player === result.data.player) {
-                        setPlayer(game.players[x])
-                    }
-                }
-                setGameState(result.data.state)
-            })
-            .catch(err => {
-            console.log(err)
-            })
-            // backgroundMusic.play()
-        })
-
-        socket.on("update state", () => {
-            console.log("update state")
-            axios.post("http://localhost:3002/getstate", {data: gameState.gameid}, {withCredentials: "true"})
-            // axios.post("http://185.202.239.81:3002/getstate", {data: gameState.gameid}, {withCredentials: "true"})
-            .then(result => {
-                console.log(result.data.state)
-                let game = result.data.state
-                for(let x = 0; x < game.players.length; x++) {
-                    if(game.players[x].player === result.data.player) {
-                        setPlayer(game.players[x])
-                    }
-                }
-                setGameState(result.data.state)
-            })
-            .catch(err => {
-            console.log(err)
-            })
-        })
-
-        axios.get("http://localhost:3002/userdetails", {withCredentials: "true"})
-        // axios.get("http://185.202.239.81:3002/userdetails", {withCredentials: "true"})
-        .then(result => {
-            let game = result.data.activegame
-            console.log(result.data)
+        socket.on("new player", (game, id) => {
+            console.log("new player joined", game, id)
+            sessionStorage.setItem("player", id)
+            sessionStorage.setItem("gameID", game.gameid)
             for(let x = 0; x < game.players.length; x++) {
-                if(game.players[x].player === result.data.player) {
+                if(game.players[x].player === id) {
                     setPlayer(game.players[x])
                 }
             }
             setGameState(game)
+        })
+
+        console.log(playerSession)
+        console.log(gameSession)
+        socket.on("update state", () => {
+            console.log("update state")
+            // axios.post(`http://localhost:3002/getstate?gameID=${gameSession}`, {withCredentials: "true"})
+            axios.post(`http://185.202.239.81:3002/getstate?gameID=${gameSession}`, {withCredentials: "true"})
+            .then(result => {
+                console.log(result)
+                let game = result.data.game
+                for(let x = 0; x < game.players.length; x++) {
+                    if(game.players[x].player === playerSession) {
+                        setPlayer(game.players[x])
+                    }
+                }
+                setGameState(result.data.game)
+            })
+            .catch(err => {
+            console.log(err)
+            })
+        })
+
+        console.log("update state")
+        // axios.post(`http://localhost:3002/getstate?gameID=${gameSession}`, {withCredentials: "true"})
+        axios.post(`http://185.202.239.81:3002/getstate?gameID=${gameSession}`, {withCredentials: "true"})
+        .then(result => {
+            console.log(result)
+            let game = result.data.game
+            for(let x = 0; x < game.players.length; x++) {
+                if(game.players[x].player === playerSession) {
+                    setPlayer(game.players[x])
+                }
+            }
+            setGameState(result.data.game)
         })
         .catch(err => {
         console.log(err)
@@ -201,7 +195,6 @@ function Game() {
         // }
     }, [])
     // console.log(player)
-    console.log(gameState.players)
 
     let playersList = gameState.players.map((item, index) => {
         if (gameState.players[index].player !== player.player) {
@@ -355,7 +348,7 @@ function Game() {
                         </div>
                         <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
                             <p style={{fontWeight: "bold"}}>Discard Pile: {gameState.discardPile.length}</p>
-                            <img src={gameState.discardPile.length === 0 ? placeholderCard : discarpileImage} alt="placeholder" className='card-image' style={{cursor: "pointer"}} onClick={() => draw("discardpile")}/>
+                            <img src={gameState.discardPile.length === 0 ? placeholderCard : new URL(`../assets/cards2/${gameState.discardPile[gameState.discardPile.length - 1]}.svg`, import.meta.url).href} alt="placeholder" className='card-image' style={{cursor: "pointer"}} onClick={() => draw("discardpile")}/>
                         </div>
                     </div>
                     <p style={{fontWeight: "bold"}}>Players: {gameState.players.length}</p>

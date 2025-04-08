@@ -47,18 +47,18 @@ const io = new Server(httpServer, {
     connectionStateRecovery: {
         maxDisconnectionDuration: 2 * 60 * 1000,
         skipMiddlewares: true
-    }
+    },
 });
 
-io.engine.use(session({
-    secret: process.env.SESSION_SECRET,
-    cookie: {
-        maxAge: 60 * 60 * 1000
-    },
-    store: store,
-    resave: true,
-    saveUninitialized: true
-}))
+// io.engine.use(session({
+//     secret: process.env.SESSION_SECRET,
+//     cookie: {
+//         maxAge: 60 * 60 * 1000
+//     },
+//     store: store,
+//     resave: true,
+//     saveUninitialized: true
+// }))
 
 function makeid(length) {
     let result = '';
@@ -188,7 +188,7 @@ async function getGamesList(filter) {
 
 app.get("/home", async (req,res) => {
     let games = await getGamesList({})
-    res.json({user: `${req.session.user}`, gamesList: games, leaderboard: []})
+    res.json({user: `${req.session.player}`, gamesList: games, leaderboard: []})
 })
 
 app.get("/userdetails", async (req,res) => {
@@ -198,64 +198,21 @@ app.get("/userdetails", async (req,res) => {
 
 app.get("/creategame", async (req, res) => {
     let gameID = `game${makeid(5)}`
-    req.session.activegame = gameID
-
     await createGame(gameID)
     res.json({gameID: gameID})
 })
 
 app.post("/getstate", async (req,res) => {
-    console.log(req.session.activegame)
-    let state = await findGame(req.session.activegame)
-    res.json({state: state, player: `${req.session.player}`})
+    console.log(req.query)
+    let gameID = req.query.gameID
+    let game = await findGame(gameID)
+    console.log(game)
+    res.json({game: game})
 })
 
 function determineWinner() {
     const randomValue = Math.random(); // 0 to 1
     return randomValue < 0.8 ? 'house' : 'player'; // 80% house win, 20% player win
-}
-
-// API to start a game
-
-app.get('/play', (req, res) => {
-    let player1Cards = []
-
-    function generateCards(count) {
-        for (let x = 0; x < count; x++) {
-            let index = Math.floor(Math.random() * gameState.deck.length)
-            player1Cards.push(gameState.deck[index])
-            gameState.deck.splice(index, 1)
-        }
-    }
-    generateCards(12)
-    // console.log(cards)
-    res.json({cards: player1Cards, gameState: "test"})
-})
-
-let gameState = {
-    gameid: "",
-    players: [],
-    winner: "none",
-    dealer: "",
-    turn: "",
-    turnIndex: 0,
-    deck: [
-        '2C', '2D', '2H', '2S', 
-        '3C', '3D', '3H', '3S', 
-        '4C', '4D', '4H', '4S', 
-        '5C', '5D', '5H', '5S', 
-        '6C', '6D', '6H', '6S', 
-        '7C', '7D', '7H', '7S', 
-        '8C', '8D', '8H', '8S', 
-        '9C', '9D', '9H', '9S', 
-        '10C', '10D', '10H', '10S',
-        'JC', 'JD', 'JH', 'JS',
-        'QC', 'QD', 'QH', 'QS',
-        'KC', 'KD', 'KH', 'KS',
-        'AC', 'AD', 'AH', 'AS'
-    ],
-    discardPile: [],
-    active: true
 }
 
 function calculateScore(cardScore) {
@@ -360,19 +317,13 @@ io.on("connection", (socket) => {
     if (socket.recovered) {
         console.log("socket recovered", socket.id)
     }
-    userSession = socket.request.session
-    console.log("active game", userSession.activegame)
-    if (userSession.activegame !== undefined) {
-        socket.join(userSession.activegame)
-    }
-    let req = socket.request
+    console.log(socket.rooms)
     
     socket.on("join game", async (gameID) => {
         console.log("joined game", gameID)
         socket.join(gameID)
-        console.log(socket.rooms)
-        let game = await findGame(gameID)
 
+        let game = await findGame(gameID)
         let deck = game.deck
         let playerCards = []
         let count = 12
@@ -387,62 +338,28 @@ io.on("connection", (socket) => {
         let newPlayer = {
             player: newPlayerId,
             score: 0,
+            betAmount: 0,
+            winAmount: 0,
+            globalMultiplier: 1,
+            balance: 0,
             cards: playerCards,
             sortedCards: sortCards(playerCards),
             connectionID: socket.id
         }
-
-        if(userSession.player === undefined || userSession.activegame !== gameID && game.players.length < 3) {
-            req.session.reload(err => {
-                if(err) {
-                    console.log(err)
-                }
-                req.session.activegame = gameID
-                req.session.player = newPlayer.player
-                req.session.save()
-            })
+        if (game.players.length < 3) {
             game.players.push(newPlayer)
             if (game.players.length === 1) {
                 await updateGame({gameid: gameID}, {$set: {players: game.players, deck: deck, turn: newPlayer.player, dealer: newPlayer.player}})
-                console.log("player has connected", socket.id)
             } else {
                 await updateGame({gameid: gameID}, {$set: {players: game.players, deck: deck}})
-                console.log("player has connected", socket.id)
             }
-            io.to(gameID).emit("new player", gameID)
-            
-        } else {
-            // let isInGame = false
-            // for (let x = 0; x < game.players.length; x++) {
-            //     if (game.players[x].player === userSession.player) {
-            //         isInGame = true
-            //     }
-            // }
-            req.session.reload(err => {
-                if(err) {
-                    console.log(err)
-                }
-                req.session.activegame = gameID
-                req.session.save()
-            })
-            // console.log(state)
-            io.to(gameID).emit("new player", gameID)
-            console.log("player has connected", socket.id)
+            io.to(gameID).emit("new player", game, newPlayerId)
+            io.emit("update state")
         }
     })
     
     socket.on("disconnect", () => {
         console.log("player disconnected", socket.id)
-        // console.log(userSession)
-        // for (let x = 0; x < gameState.players.length; x++) {
-        //     if (gameState.players[x].connectionID === socket.id) {
-        //         console.log(gameState.players[x].player, "is free")
-        //         let newDeck = gameState.deck.concat(gameState.players[x].cards)
-        //         gameState.deck = newDeck
-        //         gameState.players.splice(x, 1)
-
-        //     }
-        // }
     })
 
     socket.on("draw", async (player, deck, id) => {
@@ -463,7 +380,7 @@ io.on("connection", (socket) => {
             }
         }
         await setTurn(id)
-        io.to(id).emit("update state")
+        io.emit("update state")
     })
 
     socket.on("layoff", async (type, player, card, playerFrom, id) => {
@@ -499,7 +416,7 @@ io.on("connection", (socket) => {
         }
         await updateGame({gameid: id}, {$set: {players: gameState.players}})
         await setTurn(id)
-        io.to(id).emit("update state")
+        io.emit("update state")
     })
 
     socket.on("discard", async (pile, player, cards, id) => {
@@ -515,7 +432,7 @@ io.on("connection", (socket) => {
         }
         await updateGame({gameid: id}, {$set: {players: gameState.players, discardPile: gameState.discardPile}})
         await setTurn(id)
-        io.to(id).emit("update state")
+        io.emit("update state")
     })
 
     socket.on("game end", async (id) => {
@@ -544,7 +461,7 @@ io.on("connection", (socket) => {
         gameState.winner = winner.winner
 
         await updateGame({gameid: id}, {$set: {winner: gameState.winner, active: false}})
-        io.to(id).emit("update state")
+        io.emit("update state")
 
     })
 })

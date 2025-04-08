@@ -18,14 +18,13 @@ function Home() {
   }
 
   function joinGame(gameID) {
-    console.log(gameID)
     socket.emit("join game", gameID)
     navigate("/game")
   }
 
   function createGame() {
-    axios.get("http://localhost:3002/creategame", {withCredentials: "true"})
-    // axios.get("http://185.202.239.81:3002/creategame", {withCredentials: "true"})
+    // axios.get(`http://localhost:3002/creategame`, {withCredentials: "true"})
+    axios.get("http://185.202.239.81:3002/creategame", {withCredentials: "true"})
     .then(result => {
       console.log(result)
       socket.emit("join game", result.data.gameID)
@@ -38,16 +37,18 @@ function Home() {
   }
   
   useEffect(() => {
-    axios.get("http://localhost:3002/home", {withCredentials: "true"})
-    // axios.get("http://185.202.239.81:3002/home", {withCredentials: "true"})
+    // axios.get("http://localhost:3002/home", {withCredentials: "true"})
+    axios.get("http://185.202.239.81:3002/home", {withCredentials: "true"})
     .then(result => {
       console.log(result.data)
       let games = result.data.gamesList.map((item, index) => {
         console.log(item.active)
-        return <div className='open-game-item' key={index}>
+        if (item.players.length < 3) {
+          return <div className='open-game-item' key={index}>
           <p>gameID: {item.gameid}</p>
           <button onClick={()=> joinGame(item.gameid)}>Join</button>
         </div>
+        }
       })
       setGamesList(games)
     })
